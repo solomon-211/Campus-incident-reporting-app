@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isStaff() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff';
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      // Everyone starts as a student; staff are promoted in the console.
+      allow create: if request.auth.uid == uid
+        && request.resource.data.role == 'student';
+      // No self-promotion.
+      allow update: if request.auth.uid == uid
+        && request.resource.data.role == resource.data.role;
+    }
+
+    match /incidents/{id} {
+      // "Me too": a student may only add or remove their own uid.
+      function isOwnUpvoteOnly() {
+        let before = resource.data.upvoters.toSet();
+        let after = request.resource.data.upvoters.toSet();
+        let changed = after.difference(before).union(before.difference(after));
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvoters'])
+          && changed.size() == 1
+          && changed.hasOnly([request.auth.uid]);
+      }
+
+      allow read: if signedIn();
+
+      // Students create their own reports, always as 'submitted'.
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 5
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.description is string
+        && request.resource.data.description.size() >= 15
+        && request.resource.data.photoCount is int
+        && request.resource.data.photoCount <= 3
+        && (request.resource.data.thumbnail == null
+            || request.resource.data.thumbnail.size() < 100 * 1024)
+        && request.resource.data.upvoters.size() == 0;
+
+      // Only staff change status; students may only "me too".
+      allow update: if isStaff() || isOwnUpvoteOnly();
+
+      match /updates/{updateId} {
+        allow read: if signedIn();
+        // Staff add timeline entries. The reporter may add the single
+        // 'submitted' entry in the same batch that creates the incident.
+        allow create: if isStaff() || (
+          !exists(/databases/$(database)/documents/incidents/$(id))
+          && getAfter(/databases/$(database)/documents/incidents/$(id)).data.reporterId == request.auth.uid
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.updatedBy == request.auth.uid
+        );
+      }
+
+      // Photos are stored as bytes in Firestore (Cloud Storage needs the
+      // paid Blaze plan). They're written once, in the same batch that
+      // creates the incident, and never changed.
+      match /photos/{photoId} {
+        allow read: if signedIn();
+        allow create: if !exists(/databases/$(database)/documents/incidents/$(id))
+          && getAfter(/databases/$(database)/documents/incidents/$(id)).data.reporterId == request.auth.uid
+          && request.resource.data.data is bytes
+          && request.resource.data.data.size() < 900 * 1024;
+      }
+    }
+  }
+}
