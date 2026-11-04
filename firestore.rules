@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Signed in with a verified ALU email (checked on the auth token, so a
+    // modified client can't skip verification).
+    function verifiedAlu() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('.*@(alustudent|alueducation)[.]com$');
+    }
+
+    function hasStaffEmail() {
+      return request.auth.token.email.matches('.*@alueducation[.]com$');
+    }
+
+    // Staff actions also need a verified email, so registering an
+    // @alueducation.com address without access to its inbox gains nothing.
+    function isStaff() {
+      return verifiedAlu()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff';
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      // The role must match the email domain.
+      allow create: if request.auth.uid == uid
+        && request.resource.data.role == (hasStaffEmail() ? 'staff' : 'student');
+      // No changing your own role, except a verified staff email upgrading
+      // an account that was created as a student.
+      allow update: if request.auth.uid == uid && (
+        request.resource.data.role == resource.data.role
+        || (resource.data.role == 'student'
+            && request.resource.data.role == 'staff'
+            && verifiedAlu()
+            && hasStaffEmail())
+      );
+    }
+
+    match /incidents/{id} {
+      // "Me too": a student may only add or remove their own uid.
+      function isOwnUpvoteOnly() {
+        let before = resource.data.upvoters.toSet();
+        let after = request.resource.data.upvoters.toSet();
+        let changed = after.difference(before).union(before.difference(after));
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvoters'])
+          && changed.size() == 1
+          && changed.hasOnly([request.auth.uid]);
+      }
+
+      function isReporterOfParent() {
+        let incident = get(/databases/$(database)/documents/incidents/$(id)).data;
+        return incident.reporterId == request.auth.uid
+          && incident.status == 'submitted';
+      }
+
+      allow read: if verifiedAlu();
+
+      // Students create their own reports, always as 'submitted'.
+      allow create: if verifiedAlu()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 5
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.description is string
+        && request.resource.data.description.size() >= 15
+        && request.resource.data.photoCount is int
+        && request.resource.data.photoCount <= 3
+        && (request.resource.data.thumbnail == null
+            || request.resource.data.thumbnail.size() < 100 * 1024)
+        && request.resource.data.upvoters.size() == 0;
+
+      // Only staff change status; students may only "me too".
+      allow update: if isStaff() || (verifiedAlu() && isOwnUpvoteOnly());
+
+      // Staff remove spam or duplicates; reporters may withdraw a report
+      // until staff start working on it.
+      allow delete: if isStaff() || (
+        resource.data.reporterId == request.auth.uid
+        && resource.data.status == 'submitted'
+      );
+
+      match /updates/{updateId} {
+        allow read: if verifiedAlu();
+        allow delete: if isStaff() || isReporterOfParent();
+        // Staff add timeline entries. The reporter may add the single
+        // 'submitted' entry in the same batch that creates the incident.
+        allow create: if isStaff() || (
+          verifiedAlu()
+          && !exists(/databases/$(database)/documents/incidents/$(id))
+          && getAfter(/databases/$(database)/documents/incidents/$(id)).data.reporterId == request.auth.uid
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.updatedBy == request.auth.uid
+        );
+      }
+
+      // Photos are stored as bytes in Firestore (Cloud Storage needs the
+      // paid Blaze plan). They're written once, in the same batch that
+      // creates the incident, and never changed.
+      match /photos/{photoId} {
+        allow read: if verifiedAlu();
+        allow delete: if isStaff() || isReporterOfParent();
+        allow create: if verifiedAlu()
+          && !exists(/databases/$(database)/documents/incidents/$(id))
+          && getAfter(/databases/$(database)/documents/incidents/$(id)).data.reporterId == request.auth.uid
+          && request.resource.data.data is bytes
+          && request.resource.data.data.size() < 900 * 1024;
+      }
+    }
+  }
+}
