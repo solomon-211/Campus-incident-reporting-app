@@ -12,6 +12,11 @@ abstract final class AppConstants {
   static const staffEmailDomain = 'alueducation.com';
   static const allowedEmailDomains = [studentEmailDomain, staffEmailDomain];
 
+  /// Demo shortcut: staff accounts skip email verification because the demo
+  /// has no staff inbox. Anyone can then register as staff, so set this to
+  /// true (and restore the matching line in firestore.rules) for real use.
+  static const staffMustVerifyEmail = false;
+
   static const locations = [
     'Block A',
     'Block B — Room 204',
