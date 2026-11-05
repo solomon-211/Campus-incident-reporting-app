@@ -54,8 +54,9 @@ class AuthCubit extends Cubit<AuthState> {
       emit(const AuthUnauthenticated());
       return;
     }
-    if (!firebaseUser.emailVerified) {
-      emit(AuthUnverified(firebaseUser.email ?? ''));
+    final email = firebaseUser.email ?? '';
+    if (!firebaseUser.emailVerified && UserRole.needsVerification(email)) {
+      emit(AuthUnverified(email));
       return;
     }
     // Listening (rather than reading once) means a role change made in the
