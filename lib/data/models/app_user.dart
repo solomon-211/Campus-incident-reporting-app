@@ -3,23 +3,12 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
-import '../../core/constants.dart';
-
 enum UserRole {
   student,
   staff;
 
   static UserRole fromName(String? name) =>
       name == UserRole.staff.name ? UserRole.staff : UserRole.student;
-
-  /// ALU staff emails get the staff role; everyone else is a student.
-  static bool needsVerification(String email) =>
-      AppConstants.staffMustVerifyEmail || forEmail(email) == UserRole.student;
-
-  static UserRole forEmail(String email) =>
-      email.trim().toLowerCase().endsWith('@${AppConstants.staffEmailDomain}')
-      ? UserRole.staff
-      : UserRole.student;
 }
 
 class AppUser extends Equatable {

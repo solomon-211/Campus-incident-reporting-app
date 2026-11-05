@@ -88,15 +88,12 @@ class AuthRepository {
       );
       final user = cred.user!;
       await user.updateDisplayName(name.trim());
-      if (UserRole.needsVerification(email)) {
-        await user.sendEmailVerification();
-      }
+      await user.sendEmailVerification();
       await createProfile(
         AppUser(
           uid: user.uid,
           name: name.trim(),
           email: email.trim(),
-          role: UserRole.forEmail(email),
           program: program.trim(),
           campus: campus.trim(),
         ),
@@ -106,7 +103,7 @@ class AuthRepository {
     }
   }
 
-  /// The role comes from the email domain; the security rules check it.
+  /// New profiles are always students; staff are promoted in the console.
   Future<void> createProfile(AppUser user) {
     return _users.doc(user.uid).set(user.toCreateMap());
   }
@@ -126,15 +123,8 @@ class AuthRepository {
         uid: user.uid,
         name: user.displayName ?? email.split('@').first,
         email: email,
-        role: UserRole.forEmail(email),
       ),
     );
-  }
-
-  /// Upgrades an account created as a student before staff domains were
-  /// recognised. The rules only allow this for verified staff emails.
-  Future<void> promoteToStaff(String uid) {
-    return _users.doc(uid).update({'role': UserRole.staff.name});
   }
 
   Future<void> sendPasswordReset(String email) async {

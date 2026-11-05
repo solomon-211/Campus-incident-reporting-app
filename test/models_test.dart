@@ -112,24 +112,6 @@ void main() {
       expect(AppUser.fromMap('s', {'role': 'staff'}).isStaff, isTrue);
     });
 
-    test('only students must verify their email (demo setting)', () {
-      expect(UserRole.needsVerification('a.hassan@alustudent.com'), isTrue);
-      expect(UserRole.needsVerification('s.leek@alueducation.com'), isFalse);
-    });
-
-    test('the email domain decides the role', () {
-      expect(UserRole.forEmail('a.hassan@alustudent.com'), UserRole.student);
-      expect(UserRole.forEmail('s.samiratu@alueducation.com'), UserRole.staff);
-      expect(
-        UserRole.forEmail(' S.Samiratu@ALUEDUCATION.com '),
-        UserRole.staff,
-      );
-      expect(
-        UserRole.forEmail('someone@alueducation.com.evil.io'),
-        UserRole.student,
-      );
-    });
-
     test('a new profile is always written as a student', () {
       expect(student.toCreateMap()['role'], 'student');
     });

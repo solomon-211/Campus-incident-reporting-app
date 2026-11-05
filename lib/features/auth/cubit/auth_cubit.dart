@@ -54,9 +54,8 @@ class AuthCubit extends Cubit<AuthState> {
       emit(const AuthUnauthenticated());
       return;
     }
-    final email = firebaseUser.email ?? '';
-    if (!firebaseUser.emailVerified && UserRole.needsVerification(email)) {
-      emit(AuthUnverified(email));
+    if (!firebaseUser.emailVerified) {
+      emit(AuthUnverified(firebaseUser.email ?? ''));
       return;
     }
     // Listening (rather than reading once) means a role change made in the
@@ -65,9 +64,7 @@ class AuthCubit extends Cubit<AuthState> {
         .watchProfile(firebaseUser.uid)
         .listen(
           (profile) {
-            if (profile != null && _needsStaffRole(profile)) {
-              _promoteToStaff(profile);
-            } else if (profile != null) {
+            if (profile != null) {
               emit(AuthAuthenticated(profile));
             } else if (!_registering) {
               _repairMissingProfile(firebaseUser);
@@ -82,19 +79,6 @@ class AuthCubit extends Cubit<AuthState> {
             );
           },
         );
-  }
-
-  bool _needsStaffRole(AppUser profile) =>
-      !profile.isStaff && UserRole.forEmail(profile.email) == UserRole.staff;
-
-  /// The next profile snapshot carries the new role. If the upgrade is
-  /// refused, carry on with the account as it is.
-  Future<void> _promoteToStaff(AppUser profile) async {
-    try {
-      await _repository.promoteToStaff(profile.uid);
-    } catch (_) {
-      if (!isClosed) emit(AuthAuthenticated(profile));
-    }
   }
 
   Future<void> _repairMissingProfile(User firebaseUser) async {

@@ -14,12 +14,6 @@ service cloud.firestore {
         && request.auth.token.email.matches('.*@(alustudent|alueducation)[.]com$');
     }
 
-    function hasStaffEmail() {
-      return request.auth.token.email.matches('.*@alueducation[.]com$');
-    }
-
-    // Staff actions also need a verified email, so registering an
-    // @alueducation.com address without access to its inbox gains nothing.
     function isStaff() {
       return verifiedAlu()
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff';
@@ -27,18 +21,14 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn();
-      // The role must match the email domain.
+      // Everyone starts as a student; staff are promoted in the console.
       allow create: if request.auth.uid == uid
-        && request.resource.data.role == (hasStaffEmail() ? 'staff' : 'student');
-      // No changing your own role, except a verified staff email upgrading
-      // an account that was created as a student.
-      allow update: if request.auth.uid == uid && (
-        request.resource.data.role == resource.data.role
-        || (resource.data.role == 'student'
-            && request.resource.data.role == 'staff'
-            && verifiedAlu()
-            && hasStaffEmail())
-      );
+        && request.resource.data.role == 'student';
+      // No self-promotion, and profile pictures stay small.
+      allow update: if request.auth.uid == uid
+        && request.resource.data.role == resource.data.role
+        && (request.resource.data.get('photo', null) == null
+            || request.resource.data.photo.size() < 150 * 1024);
     }
 
     match /incidents/{id} {

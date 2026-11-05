@@ -7,15 +7,8 @@ abstract final class AppConstants {
   static const descriptionMinLength = 15;
   static const passwordMinLength = 6;
 
-  /// Only ALU accounts can sign up. The domain also decides the role.
-  static const studentEmailDomain = 'alustudent.com';
-  static const staffEmailDomain = 'alueducation.com';
-  static const allowedEmailDomains = [studentEmailDomain, staffEmailDomain];
-
-  /// Demo shortcut: staff accounts skip email verification because the demo
-  /// has no staff inbox. Anyone can then register as staff, so set this to
-  /// true (and restore the matching line in firestore.rules) for real use.
-  static const staffMustVerifyEmail = false;
+  /// Only ALU accounts can sign up.
+  static const allowedEmailDomains = ['alustudent.com', 'alueducation.com'];
 
   static const locations = [
     'Block A',
