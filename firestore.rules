@@ -6,11 +6,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Signed in with a verified ALU email (checked on the auth token, so a
-    // modified client can't skip verification).
+    function hasStaffEmail() {
+      return request.auth.token.email.matches('.*@alueducation[.]com$');
+    }
+
+    // Signed in with an ALU email. Students must have verified it (checked
+    // on the auth token, so a modified client can't skip it). Staff emails
+    // skip verification because the demo has no staff inbox.
     function verifiedAlu() {
       return signedIn()
-        && request.auth.token.email_verified == true
+        && (request.auth.token.email_verified == true || hasStaffEmail())
         && request.auth.token.email.matches('.*@(alustudent|alueducation)[.]com$');
     }
 
@@ -21,12 +26,14 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn();
-      // Everyone starts as a student; staff are promoted in the console.
+      // The role must match the email domain.
       allow create: if request.auth.uid == uid
-        && request.resource.data.role == 'student';
-      // No self-promotion, and profile pictures stay small.
+        && request.resource.data.role == (hasStaffEmail() ? 'staff' : 'student');
+      // The role can only change to the one the email domain gives.
+      // Profile pictures stay small.
       allow update: if request.auth.uid == uid
-        && request.resource.data.role == resource.data.role
+        && (request.resource.data.role == resource.data.role
+            || request.resource.data.role == (hasStaffEmail() ? 'staff' : 'student'))
         && (request.resource.data.get('photo', null) == null
             || request.resource.data.photo.size() < 150 * 1024);
     }

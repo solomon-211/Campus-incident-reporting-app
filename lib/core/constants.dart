@@ -7,8 +7,9 @@ abstract final class AppConstants {
   static const descriptionMinLength = 15;
   static const passwordMinLength = 6;
 
-  /// Only ALU accounts can sign up.
-  static const allowedEmailDomains = ['alustudent.com', 'alueducation.com'];
+  /// Only ALU accounts can sign up. Staff emails get the staff role.
+  static const staffEmailDomain = 'alueducation.com';
+  static const allowedEmailDomains = ['alustudent.com', staffEmailDomain];
 
   static const locations = [
     'Block A',

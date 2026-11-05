@@ -9,7 +9,7 @@ Campus issues currently travel through WhatsApp groups and word of mouth — mes
 ## Features
 
 ### Students
-- Register with an ALU email address and verify before gaining access
+- Register with an `@alustudent.com` email address and verify it before gaining access
 - Submit reports with a category, title, description, location and up to three photos
 - Report anonymously for sensitive or safety-related concerns
 - Track each report through **Submitted → In Progress → Resolved / Rejected**, with staff notes at every step
@@ -33,9 +33,9 @@ Campus issues currently travel through WhatsApp groups and word of mouth — mes
 
 There are two account types: **student** and **staff**.
 
-Any `@alustudent.com` or `@alueducation.com` address can register. Every account must verify its email before accessing the app. All new accounts start as students regardless of domain.
+The email domain decides the role. An `@alustudent.com` address becomes a **student** and must verify its email before accessing the app. An `@alueducation.com` address becomes **staff** and goes straight to the dashboard without verification.
 
-Staff accounts are promoted manually. Once a user has registered and verified their email, an admin opens the Firebase Console, navigates to `Firestore → users/<uid>` and changes `role` from `student` to `staff`. The app reflects the change immediately. Self-promotion is blocked at the security rules level.
+Staff skip verification because this is a demo and there is no real staff inbox to receive the link. In a real deployment staff should verify too. The security rules check the domain on the server, so a student account cannot make itself staff.
 
 ## Getting Started
 
@@ -70,7 +70,7 @@ firebase deploy --only firestore:rules --project YOUR_PROJECT_ID
 flutter run
 ```
 
-To test both roles, register two accounts and verify both. Promote one to staff in the Console, submit a report as the student, then manage it as staff.
+To test both roles, register a verified `@alustudent.com` account and any `@alueducation.com` address (it does not need to exist). Submit a report as the student, then manage it as staff.
 
 ## Project Structure
 
@@ -122,7 +122,7 @@ Access control is defined entirely in [`firestore.rules`](firestore.rules). Stud
 ## Running Tests
 
 ```bash
-flutter test      # 53 tests
+flutter test      # 54 tests
 flutter analyze
 ```
 
@@ -132,7 +132,7 @@ Test coverage includes validators, model serialisation and Firestore mapping, ro
 
 - **Photo storage** — Photos are stored as compressed bytes in Firestore rather than Firebase Storage. Storage now requires the Blaze billing plan. This works at the current scale but Storage is the appropriate long-term solution.
 - **Push notifications** — In-app alerts only fire while the app is open. Background push notifications require Cloud Functions and Cloud Messaging, both of which require Blaze.
-- **Staff promotion** — Promoting a user to staff requires a manual Firestore edit. An admin screen would be a cleaner solution.
+- **Staff verification** — Staff accounts skip email verification for the demo, so anyone can register an `@alueducation.com` address. A real deployment should require verification or an admin approval step.
 - **Search** — Report search runs on the client. This is acceptable for a single campus but would not scale to a large dataset.
 
 ## Troubleshooting
@@ -140,8 +140,8 @@ Test coverage includes validators, model serialisation and Firestore mapping, ro
 | Symptom | Fix |
 |---|---|
 | "Firebase is not configured" | Run `flutterfire configure` in the project root |
-| `permission-denied` on any Firestore operation | Deploy the security rules and confirm the account's email is verified |
-| Staff account opens as student | Confirm `role` is exactly `staff` (lowercase) in the user's Firestore document |
+| `permission-denied` on any Firestore operation | Deploy the security rules and confirm the student's email is verified |
+| Staff account opens as student | Sign out and back in; the account is upgraded to staff automatically. Make sure the rules are deployed |
 | Stuck on "Check your inbox" | Check spam, or tap Resend on the verification screen |
 
 ## License

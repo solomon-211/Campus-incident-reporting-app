@@ -54,8 +54,10 @@ class AuthCubit extends Cubit<AuthState> {
       emit(const AuthUnauthenticated());
       return;
     }
-    if (!firebaseUser.emailVerified) {
-      emit(AuthUnverified(firebaseUser.email ?? ''));
+    final email = firebaseUser.email ?? '';
+    final role = UserRole.forEmail(email);
+    if (role == UserRole.student && !firebaseUser.emailVerified) {
+      emit(AuthUnverified(email));
       return;
     }
     // Listening (rather than reading once) means a role change made in the
@@ -64,7 +66,12 @@ class AuthCubit extends Cubit<AuthState> {
         .watchProfile(firebaseUser.uid)
         .listen(
           (profile) {
-            if (profile != null) {
+            if (profile != null && role == UserRole.staff && !profile.isStaff) {
+              // Created as a student earlier; the next snapshot is staff.
+              _repository
+                  .setRole(profile.uid, role)
+                  .catchError((_) => emit(AuthAuthenticated(profile)));
+            } else if (profile != null) {
               emit(AuthAuthenticated(profile));
             } else if (!_registering) {
               _repairMissingProfile(firebaseUser);

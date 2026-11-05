@@ -112,7 +112,13 @@ void main() {
       expect(AppUser.fromMap('s', {'role': 'staff'}).isStaff, isTrue);
     });
 
-    test('a new profile is always written as a student', () {
+    test('the email domain decides the role', () {
+      expect(UserRole.forEmail('a.hassan@alustudent.com'), UserRole.student);
+      expect(UserRole.forEmail(' S.Chol@ALUEDUCATION.com '), UserRole.staff);
+      expect(UserRole.forEmail('x@alueducation.com.evil.io'), UserRole.student);
+    });
+
+    test('a student profile is written as a student', () {
       expect(student.toCreateMap()['role'], 'student');
     });
   });

@@ -88,12 +88,14 @@ class AuthRepository {
       );
       final user = cred.user!;
       await user.updateDisplayName(name.trim());
-      await user.sendEmailVerification();
+      final role = UserRole.forEmail(email);
+      if (role == UserRole.student) await user.sendEmailVerification();
       await createProfile(
         AppUser(
           uid: user.uid,
           name: name.trim(),
           email: email.trim(),
+          role: role,
           program: program.trim(),
           campus: campus.trim(),
         ),
@@ -103,7 +105,7 @@ class AuthRepository {
     }
   }
 
-  /// New profiles are always students; staff are promoted in the console.
+  /// The role comes from the email domain; the security rules check it.
   Future<void> createProfile(AppUser user) {
     return _users.doc(user.uid).set(user.toCreateMap());
   }
@@ -123,8 +125,14 @@ class AuthRepository {
         uid: user.uid,
         name: user.displayName ?? email.split('@').first,
         email: email,
+        role: UserRole.forEmail(email),
       ),
     );
+  }
+
+  /// Fixes a staff account that was saved as a student.
+  Future<void> setRole(String uid, UserRole role) {
+    return _users.doc(uid).update({'role': role.name});
   }
 
   Future<void> sendPasswordReset(String email) async {
