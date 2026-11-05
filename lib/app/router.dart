@@ -4,27 +4,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/incidents/incident_alerts.dart';
 import '../data/models/incident.dart';
+import '../data/repositories/auth_repository.dart';
 import '../data/repositories/incident_repository.dart';
-import '../data/repositories/photo_repository.dart';
+import '../data/services/photo_compressor.dart';
 import '../features/auth/cubit/auth_cubit.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/register_screen.dart';
 import '../features/auth/screens/splash_screen.dart';
 import '../features/auth/screens/verify_email_screen.dart';
 import '../features/detail/cubit/incident_detail_cubit.dart';
-import '../features/detail/incident_detail_screen.dart';
-import '../features/home/home_screen.dart';
-import '../features/home/notifications_screen.dart';
-import '../features/home/student_shell.dart';
-import '../features/profile/profile_screen.dart';
+import '../features/detail/screens/incident_detail_screen.dart';
+import '../features/home/screens/home_screen.dart';
+import '../features/home/screens/notifications_screen.dart';
+import '../features/profile/cubit/profile_cubit.dart';
+import '../features/profile/screens/profile_screen.dart';
 import '../features/report/cubit/report_form_cubit.dart';
-import '../features/report/report_form_screen.dart';
-import '../features/reports/cubit/incidents_cubit.dart';
-import '../features/reports/my_reports_screen.dart';
+import '../features/report/screens/report_form_screen.dart';
+import '../features/reports/cubit/my_reports_cubit.dart';
+import '../features/reports/screens/my_reports_screen.dart';
 import '../features/staff/cubit/staff_cubit.dart';
-import '../features/staff/staff_dashboard_screen.dart';
-import '../features/staff/update_status_sheet.dart';
+import '../features/staff/screens/staff_dashboard_screen.dart';
+import '../features/staff/widgets/update_status_sheet.dart';
+import 'student_shell.dart';
 
 /// Routes:
 ///   /splash, /login, /register         signed out
@@ -55,11 +58,17 @@ GoRouter createRouter(AuthCubit authCubit) {
         builder: (context, state, navigationShell) => BlocProvider(
           // Shared by Home and My Reports, closed on logout when the shell
           // leaves the tree.
-          create: (context) => IncidentsCubit(
+          create: (context) => MyReportsCubit(
             context.read<IncidentRepository>(),
             reporterId: authCubit.currentUser!.uid,
           )..watch(),
-          child: StudentShell(navigationShell: navigationShell),
+          child: IncidentAlertListener<MyReportsCubit, MyReportsState>(
+            alertsFor: (previous, current) => [
+              for (final i in statusChanges(previous, current))
+                '"${i.title}" is now ${i.status.label}',
+            ],
+            child: StudentShell(navigationShell: navigationShell),
+          ),
         ),
         branches: [
           StatefulShellBranch(
@@ -88,7 +97,7 @@ GoRouter createRouter(AuthCubit authCubit) {
             routes: [
               GoRoute(
                 path: '/profile',
-                builder: (_, _) => const ProfileScreen(),
+                builder: (_, _) => _profilePage(authCubit),
               ),
             ],
           ),
@@ -101,7 +110,7 @@ GoRouter createRouter(AuthCubit authCubit) {
         builder: (context, state) => BlocProvider(
           create: (context) => ReportFormCubit(
             context.read<IncidentRepository>(),
-            context.read<PhotoRepository>(),
+            context.read<PhotoCompressor>(),
             initialCategory: IncidentCategory.values
                 .asNameMap()[state.uri.queryParameters['category']],
           ),
@@ -124,7 +133,13 @@ GoRouter createRouter(AuthCubit authCubit) {
         builder: (context, state, child) => BlocProvider(
           create: (context) =>
               StaffCubit(context.read<IncidentRepository>())..watch(),
-          child: child,
+          child: IncidentAlertListener<StaffCubit, StaffState>(
+            alertsFor: (previous, current) => [
+              for (final i in newIncidents(previous, current))
+                'New report: ${i.title}',
+            ],
+            child: child,
+          ),
         ),
         routes: [
           GoRoute(
@@ -150,7 +165,7 @@ GoRouter createRouter(AuthCubit authCubit) {
               ),
               GoRoute(
                 path: 'profile',
-                builder: (_, _) => const ProfileScreen(),
+                builder: (_, _) => _profilePage(authCubit),
               ),
             ],
           ),
@@ -159,6 +174,18 @@ GoRouter createRouter(AuthCubit authCubit) {
     ],
   );
 }
+
+/// Profile for either role, with its own cubit for changing the photo.
+Widget _profilePage(AuthCubit authCubit) => Builder(
+  builder: (context) => BlocProvider(
+    create: (context) => ProfileCubit(
+      context.read<AuthRepository>(),
+      context.read<PhotoCompressor>(),
+      uid: authCubit.currentUser!.uid,
+    ),
+    child: const ProfileScreen(),
+  ),
+);
 
 /// Sends each user to the right place for their auth state and role. The
 /// security rules enforce the same split on the server.

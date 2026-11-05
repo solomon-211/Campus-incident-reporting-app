@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/constants.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/incident_repository.dart';
-import '../data/repositories/photo_repository.dart';
+import '../data/services/photo_compressor.dart';
 import '../features/auth/cubit/auth_cubit.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -19,7 +19,7 @@ class CampusApp extends StatelessWidget {
       providers: [
         RepositoryProvider(create: (_) => AuthRepository()),
         RepositoryProvider(create: (_) => IncidentRepository()),
-        RepositoryProvider(create: (_) => PhotoRepository()),
+        RepositoryProvider(create: (_) => PhotoCompressor()),
       ],
       child: BlocProvider(
         create: (context) => AuthCubit(context.read<AuthRepository>()),

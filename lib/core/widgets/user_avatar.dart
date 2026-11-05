@@ -14,11 +14,11 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = user.photoUrl;
+    final photo = user.photo;
     final avatar = CircleAvatar(
       radius: radius,
       backgroundColor: AppColors.accentTint,
-      foregroundImage: url == null || url.isEmpty ? null : NetworkImage(url),
+      foregroundImage: photo == null ? null : MemoryImage(photo),
       child: Text(
         user.initials,
         style: TextStyle(

@@ -11,6 +11,13 @@ class EmptyState extends StatelessWidget {
     this.action,
   });
 
+  /// Shown when a list couldn't load; pull-to-refresh retries.
+  const EmptyState.loadFailed(String? error, {super.key})
+    : icon = Icons.cloud_off_rounded,
+      title = error ?? 'Something went wrong',
+      message = 'Pull down to try again.',
+      action = null;
+
   final IconData icon;
   final String title;
   final String? message;
