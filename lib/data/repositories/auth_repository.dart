@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -86,7 +88,9 @@ class AuthRepository {
       );
       final user = cred.user!;
       await user.updateDisplayName(name.trim());
-      await user.sendEmailVerification();
+      if (UserRole.needsVerification(email)) {
+        await user.sendEmailVerification();
+      }
       await createProfile(
         AppUser(
           uid: user.uid,
@@ -141,6 +145,13 @@ class AuthRepository {
     }
   }
 
+  /// Saves the profile picture, or removes it when [photo] is null.
+  Future<void> updatePhoto(String uid, Uint8List? photo) {
+    return _users.doc(uid).update({
+      'photo': photo == null ? null : Blob(photo),
+    });
+  }
+
   Future<void> markNotificationsSeen(String uid) {
     return _users.doc(uid).update({
       'notificationsSeenAt': FieldValue.serverTimestamp(),
@@ -159,7 +170,11 @@ class AuthRepository {
   /// done in the email link, and returns the up-to-date user.
   Future<User?> reloadUser() async {
     await _auth.currentUser?.reload();
-    return _auth.currentUser;
+    final user = _auth.currentUser;
+    // The security rules read `email_verified` from the ID token, which
+    // otherwise keeps saying false until its hourly refresh.
+    if (user != null && user.emailVerified) await user.getIdToken(true);
+    return user;
   }
 
   Future<void> signOut() => _auth.signOut();

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
@@ -11,6 +13,9 @@ enum UserRole {
       name == UserRole.staff.name ? UserRole.staff : UserRole.student;
 
   /// ALU staff emails get the staff role; everyone else is a student.
+  static bool needsVerification(String email) =>
+      AppConstants.staffMustVerifyEmail || forEmail(email) == UserRole.student;
+
   static UserRole forEmail(String email) =>
       email.trim().toLowerCase().endsWith('@${AppConstants.staffEmailDomain}')
       ? UserRole.staff
@@ -25,7 +30,7 @@ class AppUser extends Equatable {
     this.role = UserRole.student,
     this.program = '',
     this.campus = '',
-    this.photoUrl,
+    this.photo,
     this.createdAt,
     this.notificationsSeenAt,
   });
@@ -36,7 +41,9 @@ class AppUser extends Equatable {
   final UserRole role;
   final String program;
   final String campus;
-  final String? photoUrl;
+
+  /// Small JPEG profile picture, stored on the profile document.
+  final Uint8List? photo;
   final DateTime? createdAt;
 
   /// Last time the user opened their notifications; newer updates are unread.
@@ -64,7 +71,7 @@ class AppUser extends Equatable {
       role: UserRole.fromName(map['role'] as String?),
       program: map['program'] as String? ?? '',
       campus: map['campus'] as String? ?? '',
-      photoUrl: map['photoUrl'] as String?,
+      photo: (map['photo'] as Blob?)?.bytes,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       notificationsSeenAt: (map['notificationsSeenAt'] as Timestamp?)?.toDate(),
     );
@@ -78,7 +85,6 @@ class AppUser extends Equatable {
     'role': role.name,
     'program': program,
     'campus': campus,
-    'photoUrl': photoUrl,
     'createdAt': FieldValue.serverTimestamp(),
   };
 
@@ -90,7 +96,7 @@ class AppUser extends Equatable {
     role,
     program,
     campus,
-    photoUrl,
+    photo,
     createdAt,
     notificationsSeenAt,
   ];
