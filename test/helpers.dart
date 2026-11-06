@@ -1,5 +1,15 @@
 import 'package:campus_incident_reporter/data/models/app_user.dart';
 import 'package:campus_incident_reporter/data/models/incident.dart';
+import 'package:campus_incident_reporter/data/repositories/auth_repository.dart';
+import 'package:campus_incident_reporter/data/repositories/incident_repository.dart';
+import 'package:campus_incident_reporter/data/services/photo_compressor.dart';
+import 'package:mocktail/mocktail.dart';
+
+class MockAuthRepository extends Mock implements AuthRepository {}
+
+class MockIncidentRepository extends Mock implements IncidentRepository {}
+
+class MockPhotoCompressor extends Mock implements PhotoCompressor {}
 
 const student = AppUser(
   uid: 'student-1',
@@ -20,7 +30,7 @@ Incident incident({
   String title = 'Water shortage',
   String description = 'No water supply in the residence since morning.',
   IncidentCategory category = IncidentCategory.water,
-  String location = 'Student Residence',
+  String location = 'Wellness Center',
   IncidentStatus status = IncidentStatus.submitted,
   IncidentPriority priority = IncidentPriority.medium,
   String reporterId = 'student-1',

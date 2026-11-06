@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -61,6 +62,10 @@ class _RouterAppState extends State<_RouterApp> {
 /// a list is pulled past its top or bottom. Lists just stop at the edge.
 class _NoStretchScrollBehavior extends MaterialScrollBehavior {
   const _NoStretchScrollBehavior();
+
+  // Let a mouse or trackpad drag lists too (emulators, desktop, web).
+  @override
+  Set<PointerDeviceKind> get dragDevices => PointerDeviceKind.values.toSet();
 
   @override
   Widget buildOverscrollIndicator(

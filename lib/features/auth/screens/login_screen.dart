@@ -6,6 +6,7 @@ import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
 import '../../../core/validators.dart';
 import '../../../core/widgets/field_label.dart';
+import '../../../core/widgets/no_handle_selection.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../cubit/auth_cubit.dart';
 import '../widgets/auth_scaffold.dart';
@@ -89,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const FieldLabel('Email address'),
                 TextFormField(
                   controller: _email,
+                  selectionControls: noHandleSelectionControls,
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
                   textInputAction: TextInputAction.next,
@@ -102,6 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const FieldLabel('Password'),
                 TextFormField(
                   controller: _password,
+                  selectionControls: noHandleSelectionControls,
                   obscureText: _obscure,
                   autofillHints: const [AutofillHints.password],
                   textInputAction: TextInputAction.done,

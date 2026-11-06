@@ -1,11 +1,9 @@
 import 'package:bloc_test/bloc_test.dart';
+import 'package:campus_incident_reporter/core/incidents/incident_filters.dart';
 import 'package:campus_incident_reporter/app/theme.dart';
 import 'package:campus_incident_reporter/data/models/app_user.dart';
 import 'package:campus_incident_reporter/data/models/incident.dart';
 import 'package:campus_incident_reporter/data/models/status_update.dart';
-import 'package:campus_incident_reporter/data/repositories/auth_repository.dart';
-import 'package:campus_incident_reporter/data/repositories/incident_repository.dart';
-import 'package:campus_incident_reporter/data/services/photo_compressor.dart';
 import 'package:campus_incident_reporter/features/auth/cubit/auth_cubit.dart';
 import 'package:campus_incident_reporter/features/auth/screens/login_screen.dart';
 import 'package:campus_incident_reporter/features/auth/screens/register_screen.dart';
@@ -30,12 +28,6 @@ import 'helpers.dart';
 
 class MockAuthCubit extends MockCubit<AuthState> implements AuthCubit {}
 
-class MockIncidentRepository extends Mock implements IncidentRepository {}
-
-class MockPhotoCompressor extends Mock implements PhotoCompressor {}
-
-class MockAuthRepository extends Mock implements AuthRepository {}
-
 /// Renders screens at a typical phone size so layout overflows fail the test.
 void main() {
   late MockAuthCubit auth;
@@ -49,7 +41,7 @@ void main() {
     incident(
       id: 'b',
       title: 'Broken classroom projector',
-      location: 'Block B',
+      location: 'Computer Lab',
       category: IncidentCategory.electricity,
       status: IncidentStatus.inProgress,
       priority: IncidentPriority.high,
@@ -197,7 +189,12 @@ void main() {
     );
     expect(find.text('Overflowing bin'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'In Progress'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(StatusTabs),
+        matching: find.text('In Progress'),
+      ),
+    );
     await tester.pump();
     expect(find.text('Broken classroom projector'), findsOneWidget);
     expect(find.text('Overflowing bin'), findsNothing);
@@ -228,7 +225,7 @@ void main() {
       scrollable: page,
     );
     expect(find.text('Please select a category'), findsOneWidget);
-    verifyNever(() => repo.createIncident(any(), photos: any(named: 'photos')));
+    verifyNever(() => repo.createIncident(any(), files: any(named: 'files')));
   });
 
   testWidgets('Incident details show the timeline and Me too', (tester) async {

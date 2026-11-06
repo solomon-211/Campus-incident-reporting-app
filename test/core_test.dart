@@ -38,9 +38,9 @@ void main() {
       );
     });
 
-    test('at most 3 photos', () {
-      expect(Validators.photoCount(3), isNull);
-      expect(Validators.photoCount(4), isNotNull);
+    test('at most 3 attachments', () {
+      expect(Validators.attachmentCount(3), isNull);
+      expect(Validators.attachmentCount(4), isNotNull);
     });
   });
 

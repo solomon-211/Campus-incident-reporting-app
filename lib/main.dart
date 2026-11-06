@@ -1,8 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'app/theme.dart';
+import 'core/constants.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -10,6 +12,11 @@ Future<void> main() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Supabase only stores report files; Firebase handles everything else.
+    await Supabase.initialize(
+      url: AppConstants.supabaseUrl,
+      publishableKey: AppConstants.supabaseKey,
     );
   } catch (e) {
     runApp(_FirebaseSetupError(error: e));

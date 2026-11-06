@@ -4,14 +4,23 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/app_user.dart';
+import '../models/attachment.dart';
 import '../models/incident.dart';
 import '../models/status_update.dart';
+import '../services/file_storage.dart';
+
+/// Thrown when a photo or PDF can't be uploaded; nothing is saved.
+class UploadFailure implements Exception {
+  const UploadFailure();
+}
 
 class IncidentRepository {
-  IncidentRepository({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  IncidentRepository({FirebaseFirestore? firestore, FileStorage? files})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _files = files ?? FileStorage();
 
   final FirebaseFirestore _firestore;
+  final FileStorage _files;
 
   CollectionReference<Map<String, dynamic>> get _incidents =>
       _firestore.collection('incidents');
@@ -68,26 +77,35 @@ class IncidentRepository {
     });
   }
 
+  /// Photos of older reports, which were stored as bytes in Firestore.
   Future<List<Uint8List>> loadPhotos(String incidentId) async {
     final snap = await _photos(incidentId).orderBy('index').get();
     return [for (final d in snap.docs) (d.data()['data'] as Blob).bytes];
   }
 
-  /// Writes the incident, its photos and the first timeline entry in one
-  /// batch. Offline, the write lands in the local cache and syncs later, so
-  /// we only wait briefly for the server.
+  /// Uploads the files to Supabase first, then writes the incident (with
+  /// the file links) and its first timeline entry in one batch. Without
+  /// files this works offline: the write lands in the local cache and syncs
+  /// later, so we only wait briefly for the server.
   Future<void> createIncident(
     Incident incident, {
-    List<Uint8List> photos = const [],
+    List<NewAttachment> files = const [],
   }) async {
-    final batch = _firestore.batch();
-    batch.set(_incidents.doc(incident.id), incident.toCreateMap());
-    for (var i = 0; i < photos.length; i++) {
-      batch.set(_photos(incident.id).doc('$i'), {
-        'index': i,
-        'data': Blob(photos[i]),
-      });
+    final List<Attachment> uploaded;
+    try {
+      uploaded = [
+        for (var i = 0; i < files.length; i++)
+          await _files.upload(incident.id, i, files[i]),
+      ];
+    } catch (_) {
+      throw const UploadFailure();
     }
+
+    final batch = _firestore.batch();
+    batch.set(_incidents.doc(incident.id), {
+      ...incident.toCreateMap(),
+      'attachments': [for (final a in uploaded) a.toMap()],
+    });
     batch.set(
       _updates(incident.id).doc(),
       StatusUpdate(

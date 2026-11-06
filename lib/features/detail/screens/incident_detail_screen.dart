@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
@@ -219,28 +218,10 @@ class _DetailBody extends StatelessWidget {
         const SizedBox(height: 20),
         const _SectionTitle('Description'),
         Text(incident.description, style: const TextStyle(height: 1.5)),
-        if (incident.photoCount > 0) ...[
+        if (incident.hasFiles) ...[
           const SizedBox(height: 20),
-          _SectionTitle(
-            incident.photoCount == 1 ? 'Attached Photo' : 'Attached Photos',
-          ),
-          if (state.photos.isNotEmpty)
-            _Photos(photos: state.photos)
-          else if (state.photosLoading)
-            Container(
-              height: 200,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const CircularProgressIndicator(),
-            )
-          else
-            Text(
-              'Photos could not be loaded.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+          const _SectionTitle('Attachments'),
+          _Attachments(incident: incident, state: state),
         ],
       ],
     );
@@ -298,9 +279,78 @@ class _MeToo extends StatelessWidget {
   }
 }
 
+/// Photos and PDFs from Supabase, plus photos of older reports that were
+/// stored in Firestore.
+class _Attachments extends StatelessWidget {
+  const _Attachments({required this.incident, required this.state});
+
+  final Incident incident;
+  final IncidentDetailState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final photos = <ImageProvider>[
+      for (final a in incident.imageAttachments) NetworkImage(a.url),
+      for (final bytes in state.photos) MemoryImage(bytes),
+    ];
+    final pdfs = incident.pdfAttachments;
+    final olderPhotosMissing = incident.photoCount > 0 && state.photos.isEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: [
+        if (photos.isNotEmpty) _Photos(photos: photos),
+        if (olderPhotosMissing && state.photosLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (olderPhotosMissing)
+          Text(
+            'Photos could not be loaded.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        for (final pdf in pdfs) _PdfTile(name: pdf.name, url: pdf.url),
+      ],
+    );
+  }
+}
+
+/// Opens the PDF in the phone's PDF viewer or browser.
+class _PdfTile extends StatelessWidget {
+  const _PdfTile({required this.name, required this.url});
+
+  final String name;
+  final String url;
+
+  Future<void> _open(BuildContext context) async {
+    final opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    ).catchError((_) => false);
+    if (!opened && context.mounted) {
+      context.showSnack('Could not open this PDF.', error: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.redTint,
+      borderRadius: BorderRadius.circular(12),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        leading: const Icon(Icons.picture_as_pdf_rounded, color: AppColors.red),
+        title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: const Text('Tap to open'),
+        trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+        onTap: () => _open(context),
+      ),
+    );
+  }
+}
+
 class _Photos extends StatelessWidget {
   const _Photos({required this.photos});
-  final List<Uint8List> photos;
+  final List<ImageProvider> photos;
 
   @override
   Widget build(BuildContext context) {
@@ -308,11 +358,19 @@ class _Photos extends StatelessWidget {
       onTap: () => PhotoViewer.open(context, photos, i),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.memory(
-          photos[i],
+        child: Image(
+          image: photos[i],
           height: height,
           fit: BoxFit.cover,
           gaplessPlayback: true,
+          loadingBuilder: (_, child, progress) => progress == null
+              ? child
+              : Container(
+                  height: height,
+                  color: AppColors.border,
+                  alignment: Alignment.center,
+                  child: const CircularProgressIndicator(),
+                ),
           errorBuilder: (_, _, _) => Container(
             height: height,
             color: AppColors.border,

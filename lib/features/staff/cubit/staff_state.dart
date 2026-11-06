@@ -22,12 +22,6 @@ class StaffState extends IncidentListState<StaffState> {
 
   final StaffSort sort;
 
-  /// Counts for the status tabs; `null` is "All".
-  Map<IncidentStatus?, int> get counts => {
-    null: all.length,
-    for (final s in IncidentStatus.values) s: count(s),
-  };
-
   /// High-priority reports that are still open.
   int get urgentCount => all
       .where(

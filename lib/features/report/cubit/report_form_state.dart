@@ -9,7 +9,7 @@ class ReportFormState extends Equatable {
     this.description = '',
     this.location,
     this.isAnonymous = false,
-    this.images = const [],
+    this.files = const [],
     this.status = ReportFormStatus.editing,
     this.errorMessage,
     this.showErrors = false,
@@ -22,8 +22,8 @@ class ReportFormState extends Equatable {
   final String? location;
   final bool isAnonymous;
 
-  /// Raw bytes rather than files so this also works on web.
-  final List<Uint8List> images;
+  /// Photos and PDFs, held as bytes until the report is submitted.
+  final List<NewAttachment> files;
   final ReportFormStatus status;
 
   final String? errorMessage;
@@ -33,21 +33,21 @@ class ReportFormState extends Equatable {
   final String? createdIncidentId;
 
   bool get isSubmitting => status == ReportFormStatus.submitting;
-  bool get canAddPhotos => images.length < AppConstants.maxPhotos;
+  bool get canAddFiles => files.length < AppConstants.maxAttachments;
 
   String? get categoryError =>
       category == null ? 'Please select a category' : null;
   String? get titleError => Validators.title(title);
   String? get descriptionError => Validators.description(description);
   String? get locationError => Validators.required(location, 'Location');
-  String? get photosError => Validators.photoCount(images.length);
+  String? get filesError => Validators.attachmentCount(files.length);
 
   bool get isValid =>
       categoryError == null &&
       titleError == null &&
       descriptionError == null &&
       locationError == null &&
-      photosError == null;
+      filesError == null;
 
   ReportFormState copyWith({
     IncidentCategory? category,
@@ -55,7 +55,7 @@ class ReportFormState extends Equatable {
     String? description,
     String? location,
     bool? isAnonymous,
-    List<Uint8List>? images,
+    List<NewAttachment>? files,
     ReportFormStatus? status,
     String? errorMessage,
     bool clearError = false,
@@ -68,7 +68,7 @@ class ReportFormState extends Equatable {
       description: description ?? this.description,
       location: location ?? this.location,
       isAnonymous: isAnonymous ?? this.isAnonymous,
-      images: images ?? this.images,
+      files: files ?? this.files,
       status: status ?? this.status,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       showErrors: showErrors ?? this.showErrors,
@@ -83,7 +83,7 @@ class ReportFormState extends Equatable {
     description,
     location,
     isAnonymous,
-    images,
+    files,
     status,
     errorMessage,
     showErrors,

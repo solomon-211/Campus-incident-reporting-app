@@ -4,8 +4,8 @@ import 'dart:typed_data';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:campus_incident_reporter/core/load_status.dart';
 import 'package:campus_incident_reporter/core/incidents/incident_alerts.dart';
+import 'package:campus_incident_reporter/data/models/attachment.dart';
 import 'package:campus_incident_reporter/data/models/incident.dart';
-import 'package:campus_incident_reporter/data/repositories/auth_repository.dart';
 import 'package:campus_incident_reporter/data/repositories/incident_repository.dart';
 import 'package:campus_incident_reporter/data/services/photo_compressor.dart';
 import 'package:campus_incident_reporter/features/detail/cubit/incident_detail_cubit.dart';
@@ -18,11 +18,14 @@ import 'package:mocktail/mocktail.dart';
 
 import 'helpers.dart';
 
-class MockAuthRepository extends Mock implements AuthRepository {}
+NewAttachment photoFile(Uint8List bytes) =>
+    NewAttachment(name: 'Photo', bytes: bytes, type: AttachmentType.image);
 
-class MockIncidentRepository extends Mock implements IncidentRepository {}
-
-class MockPhotoCompressor extends Mock implements PhotoCompressor {}
+final pdfFile = NewAttachment(
+  name: 'quote.pdf',
+  bytes: Uint8List.fromList([37, 80, 68, 70]),
+  type: AttachmentType.pdf,
+);
 
 void main() {
   late MockIncidentRepository incidents;
@@ -32,6 +35,7 @@ void main() {
     registerFallbackValue(incident());
     registerFallbackValue(Uint8List(0));
     registerFallbackValue(<Uint8List>[]);
+    registerFallbackValue(<NewAttachment>[]);
     registerFallbackValue(student);
     registerFallbackValue(IncidentStatus.submitted);
     registerFallbackValue(IncidentPriority.medium);
@@ -46,7 +50,7 @@ void main() {
   final projector = incident(
     id: 'b',
     title: 'Broken classroom projector',
-    location: 'Block B',
+    location: 'Computer Lab',
     description: 'The projector does not turn on at all.',
     category: IncidentCategory.electricity,
     status: IncidentStatus.inProgress,
@@ -162,15 +166,6 @@ void main() {
           expect(cubit.state.filtered.map((i) => i.id), ['b', 'a', 'c']),
     );
 
-    test('counts per status include an "All" total', () {
-      final state = StaffState(
-        status: LoadStatus.loaded,
-        all: [water, projector, bin],
-      );
-      expect(state.counts[null], 3);
-      expect(state.counts[IncidentStatus.rejected], 0);
-    });
-
     test('updateStatus requires a note and calls the repository', () async {
       when(
         () => incidents.updateStatus(
@@ -219,7 +214,7 @@ void main() {
         ..setCategory(IncidentCategory.water)
         ..setTitle('Water shortage')
         ..setDescription('No water in the residence since this morning.')
-        ..setLocation('Student Residence');
+        ..setLocation('Wellness Center');
     }
 
     test('shows errors and does not submit an invalid form', () async {
@@ -230,7 +225,7 @@ void main() {
       expect(cubit.state.titleError, isNotNull);
       expect(cubit.state.status, ReportFormStatus.editing);
       verifyNever(
-        () => incidents.createIncident(any(), photos: any(named: 'photos')),
+        () => incidents.createIncident(any(), files: any(named: 'files')),
       );
       await cubit.close();
     });
@@ -246,19 +241,22 @@ void main() {
       await cubit.close();
     });
 
-    test('caps photos at 3', () async {
+    test('caps photos and PDFs at 3 files in total', () async {
       final cubit = ReportFormCubit(incidents, photos);
-      final dropped = cubit.addImages(List.generate(5, (_) => Uint8List(1)));
+      final dropped = cubit.addFiles([
+        ...List.generate(4, (_) => photoFile(Uint8List(1))),
+        pdfFile,
+      ]);
       expect(dropped, 2);
-      expect(cubit.state.images, hasLength(3));
-      expect(cubit.state.canAddPhotos, isFalse);
-      cubit.removeImage(0);
-      expect(cubit.state.images, hasLength(2));
+      expect(cubit.state.files, hasLength(3));
+      expect(cubit.state.canAddFiles, isFalse);
+      cubit.removeFile(0);
+      expect(cubit.state.files, hasLength(2));
       await cubit.close();
     });
 
     test(
-      'compresses photos, then saves them with the incident as the reporter',
+      'compresses photos, keeps PDFs as they are, and saves them in order',
       () async {
         final full = Uint8List(10);
         final thumb = Uint8List(2);
@@ -266,15 +264,14 @@ void main() {
         when(() => photos.prepare(any())).thenAnswer(
           (_) async => PreparedPhotos(photos: [full], thumbnail: thumb),
         );
-        when(
-          () => incidents.createIncident(any(), photos: any(named: 'photos')),
-        ).thenAnswer((_) async {});
+        when(() => incidents.createIncident(any(), files: any(named: 'files')))
+            .thenAnswer((_) async {});
 
         final cubit = ReportFormCubit(incidents, photos);
         fillValidForm(cubit);
         cubit
           ..setAnonymous(true)
-          ..addImages([Uint8List(3)]);
+          ..addFiles([pdfFile, photoFile(Uint8List(3))]);
         await cubit.submit(student);
 
         expect(cubit.state.status, ReportFormStatus.success);
@@ -282,17 +279,20 @@ void main() {
         final captured = verify(
           () => incidents.createIncident(
             captureAny(),
-            photos: captureAny(named: 'photos'),
+            files: captureAny(named: 'files'),
           ),
         ).captured;
         final created = captured[0] as Incident;
         expect(created.id, 'new-id');
         expect(created.reporterId, student.uid);
-        expect(created.photoCount, 1);
         expect(created.thumbnail, same(thumb));
         expect(created.isAnonymous, isTrue);
         expect(created.status, IncidentStatus.submitted);
-        expect(captured[1], [full]);
+        verify(() => photos.prepare([Uint8List(3)])).called(1);
+        expect(captured[1], [
+          pdfFile,
+          NewAttachment(name: 'Photo', bytes: full, type: AttachmentType.image),
+        ]);
         await cubit.close();
       },
     );
@@ -302,7 +302,7 @@ void main() {
       when(() => photos.prepare(any())).thenAnswer(
         (_) async => const PreparedPhotos(photos: [], thumbnail: null),
       );
-      when(() => incidents.createIncident(any(), photos: any(named: 'photos')))
+      when(() => incidents.createIncident(any(), files: any(named: 'files')))
           .thenAnswer((_) async {});
 
       final cubit = ReportFormCubit(incidents, photos);
@@ -314,7 +314,7 @@ void main() {
           verify(
                 () => incidents.createIncident(
                   captureAny(),
-                  photos: any(named: 'photos'),
+                  files: any(named: 'files'),
                 ),
               ).captured.single
               as Incident;
@@ -330,13 +330,13 @@ void main() {
 
       final cubit = ReportFormCubit(incidents, photos);
       fillValidForm(cubit);
-      cubit.addImages([Uint8List(3)]);
+      cubit.addFiles([photoFile(Uint8List(3))]);
       await cubit.submit(student);
 
       expect(cubit.state.status, ReportFormStatus.failure);
       expect(cubit.state.errorMessage, contains('too large'));
       verifyNever(
-        () => incidents.createIncident(any(), photos: any(named: 'photos')),
+        () => incidents.createIncident(any(), files: any(named: 'files')),
       );
       await cubit.close();
     });
@@ -346,7 +346,7 @@ void main() {
       when(() => photos.prepare(any())).thenAnswer(
         (_) async => const PreparedPhotos(photos: [], thumbnail: null),
       );
-      when(() => incidents.createIncident(any(), photos: any(named: 'photos')))
+      when(() => incidents.createIncident(any(), files: any(named: 'files')))
           .thenThrow(Exception('permission-denied'));
 
       final cubit = ReportFormCubit(incidents, photos);
@@ -355,6 +355,24 @@ void main() {
 
       expect(cubit.state.status, ReportFormStatus.failure);
       expect(cubit.state.errorMessage, contains('connection'));
+      await cubit.close();
+    });
+
+    test('says so when the files could not be uploaded', () async {
+      when(() => incidents.newIncidentId()).thenReturn('new-id');
+      when(() => photos.prepare(any())).thenAnswer(
+        (_) async => const PreparedPhotos(photos: [], thumbnail: null),
+      );
+      when(() => incidents.createIncident(any(), files: any(named: 'files')))
+          .thenThrow(const UploadFailure());
+
+      final cubit = ReportFormCubit(incidents, photos);
+      fillValidForm(cubit);
+      cubit.addFiles([pdfFile]);
+      await cubit.submit(student);
+
+      expect(cubit.state.status, ReportFormStatus.failure);
+      expect(cubit.state.errorMessage, contains('upload your files'));
       await cubit.close();
     });
   });

@@ -13,6 +13,8 @@ Future<void> showStaffFilterSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    // Size to the content instead of the default 9/16 of the screen.
+    isScrollControlled: true,
     backgroundColor: AppColors.surface,
     builder: (_) => BlocProvider.value(value: cubit, child: const _Sheet()),
   );
@@ -26,7 +28,8 @@ class _Sheet extends StatelessWidget {
     final cubit = context.read<StaffCubit>();
     return BlocBuilder<StaffCubit, StaffState>(
       builder: (context, state) => SafeArea(
-        child: Padding(
+        // Scrolls on very short screens rather than overflowing.
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -88,7 +91,10 @@ class _Sheet extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Show ${state.filtered.length} reports'),
+                  child: Text(
+                    'Show ${state.filtered.length} '
+                    '${state.filtered.length == 1 ? 'report' : 'reports'}',
+                  ),
                 ),
               ),
             ],

@@ -47,7 +47,6 @@ class StaffDashboardScreen extends StatelessWidget {
                       StatusTabs(
                         selected: state.statusFilter,
                         onSelected: cubit.setStatusFilter,
-                        counts: state.counts,
                       ),
                       const SizedBox(height: 16),
                       _QueueHeading(state: state, shown: filtered.length),

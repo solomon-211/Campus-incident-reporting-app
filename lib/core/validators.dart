@@ -51,9 +51,9 @@ abstract final class Validators {
     return null;
   }
 
-  static String? photoCount(int count) {
-    if (count > AppConstants.maxPhotos) {
-      return 'You can attach at most ${AppConstants.maxPhotos} photos';
+  static String? attachmentCount(int count) {
+    if (count > AppConstants.maxAttachments) {
+      return 'You can attach at most ${AppConstants.maxAttachments} files';
     }
     return null;
   }

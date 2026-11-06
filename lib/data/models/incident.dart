@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
+import 'attachment.dart';
+
 enum IncidentStatus {
   submitted('Submitted'),
   inProgress('In Progress'),
@@ -60,6 +62,7 @@ class Incident extends Equatable {
     required this.reporterName,
     this.photoCount = 0,
     this.thumbnail,
+    this.attachments = const [],
     this.status = IncidentStatus.submitted,
     this.priority = IncidentPriority.medium,
     this.isAnonymous = false,
@@ -76,12 +79,16 @@ class Incident extends Equatable {
   final IncidentCategory category;
   final String location;
 
-  /// Number of full-size photos in the `photos` subcollection.
+  /// Photos stored as bytes in the `photos` subcollection. Only older
+  /// reports have these; new files go to Supabase ([attachments]).
   final int photoCount;
 
   /// Small JPEG preview of the first photo, stored on the incident itself so
   /// lists don't have to load full photos.
   final Uint8List? thumbnail;
+
+  /// Photos and PDFs uploaded to Supabase Storage.
+  final List<Attachment> attachments;
   final IncidentStatus status;
   final IncidentPriority priority;
   final String reporterId;
@@ -99,6 +106,14 @@ class Incident extends Equatable {
   final bool hasPendingWrites;
 
   int get upvoteCount => upvoters.length;
+
+  List<Attachment> get imageAttachments =>
+      attachments.where((a) => !a.isPdf).toList();
+
+  List<Attachment> get pdfAttachments =>
+      attachments.where((a) => a.isPdf).toList();
+
+  bool get hasFiles => photoCount > 0 || attachments.isNotEmpty;
 
   /// Falls back to "now" while the server timestamp is still pending.
   DateTime get createdAtOrNow => createdAt ?? DateTime.now();
@@ -156,6 +171,10 @@ class Incident extends Equatable {
       location: map['location'] as String? ?? '',
       photoCount: (map['photoCount'] as num?)?.toInt() ?? 0,
       thumbnail: (map['thumbnail'] as Blob?)?.bytes,
+      attachments: [
+        for (final a in map['attachments'] as List? ?? const [])
+          Attachment.fromMap(Map<String, dynamic>.from(a as Map)),
+      ],
       status: IncidentStatus.fromName(map['status'] as String?),
       priority: IncidentPriority.fromName(map['priority'] as String?),
       reporterId: map['reporterId'] as String? ?? '',
@@ -176,6 +195,7 @@ class Incident extends Equatable {
     'location': location,
     'photoCount': photoCount,
     'thumbnail': thumbnail == null ? null : Blob(thumbnail!),
+    'attachments': [for (final a in attachments) a.toMap()],
     'status': IncidentStatus.submitted.name,
     'priority': priority.name,
     'reporterId': reporterId,
@@ -195,6 +215,7 @@ class Incident extends Equatable {
     location,
     photoCount,
     thumbnail,
+    attachments,
     status,
     priority,
     reporterId,

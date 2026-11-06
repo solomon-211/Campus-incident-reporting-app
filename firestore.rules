@@ -66,8 +66,9 @@ service cloud.firestore {
         && request.resource.data.title.size() <= 80
         && request.resource.data.description is string
         && request.resource.data.description.size() >= 15
-        && request.resource.data.photoCount is int
-        && request.resource.data.photoCount <= 3
+        && request.resource.data.photoCount == 0
+        && request.resource.data.attachments is list
+        && request.resource.data.attachments.size() <= 3
         && (request.resource.data.thumbnail == null
             || request.resource.data.thumbnail.size() < 100 * 1024)
         && request.resource.data.upvoters.size() == 0;
@@ -96,17 +97,11 @@ service cloud.firestore {
         );
       }
 
-      // Photos are stored as bytes in Firestore (Cloud Storage needs the
-      // paid Blaze plan). They're written once, in the same batch that
-      // creates the incident, and never changed.
+      // Photos of older reports, stored as bytes before files moved to
+      // Supabase Storage. Read-only now, except for cleanup on delete.
       match /photos/{photoId} {
         allow read: if verifiedAlu();
         allow delete: if isStaff() || isReporterOfParent();
-        allow create: if verifiedAlu()
-          && !exists(/databases/$(database)/documents/incidents/$(id))
-          && getAfter(/databases/$(database)/documents/incidents/$(id)).data.reporterId == request.auth.uid
-          && request.resource.data.data is bytes
-          && request.resource.data.data.size() < 900 * 1024;
       }
     }
   }

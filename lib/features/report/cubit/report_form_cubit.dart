@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants.dart';
 import '../../../core/validators.dart';
 import '../../../data/models/app_user.dart';
+import '../../../data/models/attachment.dart';
 import '../../../data/models/incident.dart';
 import '../../../data/repositories/incident_repository.dart';
 import '../../../data/services/photo_compressor.dart';
@@ -34,17 +35,37 @@ class ReportFormCubit extends Cubit<ReportFormState> {
 
   void setAnonymous(bool value) => emit(state.copyWith(isAnonymous: value));
 
-  /// Adds photos up to the limit. Returns how many were left out.
-  int addImages(List<Uint8List> picked) {
-    final room = AppConstants.maxPhotos - state.images.length;
+  /// Adds photos or PDFs up to the limit. Returns how many were left out.
+  int addFiles(List<NewAttachment> picked) {
+    final room = AppConstants.maxAttachments - state.files.length;
     final accepted = picked.take(room).toList();
-    emit(state.copyWith(images: [...state.images, ...accepted]));
+    emit(state.copyWith(files: [...state.files, ...accepted]));
     return picked.length - accepted.length;
   }
 
-  void removeImage(int index) {
-    final images = [...state.images]..removeAt(index);
-    emit(state.copyWith(images: images));
+  void removeFile(int index) {
+    final files = [...state.files]..removeAt(index);
+    emit(state.copyWith(files: files));
+  }
+
+  /// Compresses the photos (PDFs are left as they are) and returns the files
+  /// to upload, in the order they were picked, plus a thumbnail for lists.
+  Future<(List<NewAttachment>, Uint8List?)> _prepareFiles() async {
+    final images = state.files.where((f) => !f.isPdf).toList();
+    final prepared = await _photos.prepare([for (final f in images) f.bytes]);
+    var next = 0;
+    final files = [
+      for (final f in state.files)
+        if (f.isPdf)
+          f
+        else
+          NewAttachment(
+            name: f.name,
+            bytes: prepared.photos[next++],
+            type: AttachmentType.image,
+          ),
+    ];
+    return (files, prepared.thumbnail);
   }
 
   Future<void> submit(AppUser reporter) async {
@@ -55,18 +76,17 @@ class ReportFormCubit extends Cubit<ReportFormState> {
     emit(state.copyWith(status: ReportFormStatus.submitting));
     try {
       final id = _incidents.newIncidentId();
-      final prepared = await _photos.prepare(state.images);
+      final (files, thumbnail) = await _prepareFiles();
 
       await _incidents.createIncident(
-        photos: prepared.photos,
+        files: files,
         Incident(
           id: id,
           title: state.title.trim(),
           description: state.description.trim(),
           category: state.category!,
           location: state.location!,
-          photoCount: prepared.photos.length,
-          thumbnail: prepared.thumbnail,
+          thumbnail: thumbnail,
           reporterId: reporter.uid,
           reporterName: reporter.name,
           isAnonymous: state.isAnonymous,
@@ -87,6 +107,17 @@ class ReportFormCubit extends Cubit<ReportFormState> {
           state.copyWith(
             status: ReportFormStatus.failure,
             errorMessage: e.toString(),
+          ),
+        );
+      }
+    } on UploadFailure {
+      if (!isClosed) {
+        emit(
+          state.copyWith(
+            status: ReportFormStatus.failure,
+            errorMessage:
+                'Could not upload your files. Check your connection '
+                'and try again.',
           ),
         );
       }

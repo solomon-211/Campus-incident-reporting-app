@@ -59,10 +59,9 @@ class _FadeSlideInState extends State<FadeSlideIn>
 /// responsive. Uses raw pointer events, so it never competes with the
 /// child's own tap handling.
 class Pressable extends StatefulWidget {
-  const Pressable({super.key, required this.child, this.scale = 0.97});
+  const Pressable({super.key, required this.child});
 
   final Widget child;
-  final double scale;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -82,7 +81,7 @@ class _PressableState extends State<Pressable> {
       onPointerUp: (_) => _set(false),
       onPointerCancel: (_) => _set(false),
       child: AnimatedScale(
-        scale: _down ? widget.scale : 1,
+        scale: _down ? 0.97 : 1,
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
         child: widget.child,

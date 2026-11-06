@@ -9,39 +9,78 @@ class StatusTabs extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onSelected,
-    this.counts,
   });
 
   final IncidentStatus? selected;
   final ValueChanged<IncidentStatus?> onSelected;
 
-  final Map<IncidentStatus?, int>? counts;
-
   @override
   Widget build(BuildContext context) {
     final options = <IncidentStatus?>[null, ...IncidentStatus.values];
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: options.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final status = options[i];
-          final isSelected = status == selected;
-          final count = counts?[status];
-          return ChoiceChip(
-            selected: isSelected,
-            onSelected: (_) => onSelected(status),
-            label: Text(
-              '${status?.label ?? 'All'}${count == null ? '' : ' ($count)'}',
-              style: TextStyle(
-                color: isSelected ? Colors.white : AppColors.textSecondary,
-                fontSize: 13,
+    // Every tab gets an equal share of the width, so none is ever hidden.
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          for (final status in options)
+            Expanded(
+              child: _StatusSegment(
+                label: status?.label ?? 'All',
+                selected: status == selected,
+                onTap: () => onSelected(status),
               ),
             ),
-          );
-        },
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusSegment extends StatelessWidget {
+  const _StatusSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

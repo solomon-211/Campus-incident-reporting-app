@@ -1,26 +1,30 @@
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../app/theme.dart';
+import '../constants.dart';
 import '../extensions.dart';
 
 /// What the user picked in [showPhotoSourceSheet].
-enum PhotoSourceChoice { camera, gallery, remove }
+enum PhotoSourceChoice { camera, gallery, pdf, remove }
 
 extension PhotoSourceChoiceSource on PhotoSourceChoice {
   ImageSource? get imageSource => switch (this) {
     PhotoSourceChoice.camera => ImageSource.camera,
     PhotoSourceChoice.gallery => ImageSource.gallery,
-    PhotoSourceChoice.remove => null,
+    PhotoSourceChoice.pdf || PhotoSourceChoice.remove => null,
   };
 }
 
-/// Bottom sheet offering camera or gallery, plus "Remove photo" when
-/// [canRemove] is set. Returns null if dismissed.
+/// Bottom sheet offering camera or gallery, plus "Attach a PDF" when
+/// [allowPdf] is set and "Remove photo" when [canRemove] is set. Returns
+/// null if dismissed.
 Future<PhotoSourceChoice?> showPhotoSourceSheet(
   BuildContext context, {
+  bool allowPdf = false,
   bool canRemove = false,
 }) {
   return showModalBottomSheet<PhotoSourceChoice>(
@@ -40,6 +44,12 @@ Future<PhotoSourceChoice?> showPhotoSourceSheet(
             title: const Text('Choose from gallery'),
             onTap: () => Navigator.pop(context, PhotoSourceChoice.gallery),
           ),
+          if (allowPdf)
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Attach a PDF'),
+              onTap: () => Navigator.pop(context, PhotoSourceChoice.pdf),
+            ),
           if (canRemove)
             ListTile(
               leading: const Icon(
@@ -82,4 +92,29 @@ Future<List<Uint8List>> pickPhotos(
     return const [];
   }
   return [for (final f in files) await f.readAsBytes()];
+}
+
+/// Lets the user choose one PDF and returns its name and bytes, or null if
+/// cancelled, unreadable or over [AppConstants.maxPdfBytes].
+Future<({String name, Uint8List bytes})?> pickPdf(BuildContext context) async {
+  try {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+    );
+    if (file == null) return null;
+    final bytes = await file.readAsBytes();
+    if (bytes.length > AppConstants.maxPdfBytes) {
+      if (context.mounted) {
+        context.showSnack('PDFs must be smaller than 10 MB.', error: true);
+      }
+      return null;
+    }
+    return (name: file.name, bytes: bytes);
+  } catch (_) {
+    if (context.mounted) {
+      context.showSnack('Could not open that file.', error: true);
+    }
+    return null;
+  }
 }

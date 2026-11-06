@@ -10,6 +10,7 @@ import '../../../core/widgets/field_label.dart';
 import '../../../core/widgets/photo_picker.dart';
 import '../../../core/widgets/hero_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../data/models/attachment.dart';
 import '../../../data/models/incident.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../cubit/report_form_cubit.dart';
@@ -141,19 +142,18 @@ class _ReportForm extends StatelessWidget {
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const FieldLabel('Add a photo'),
+                const FieldLabel('Photos or PDF'),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    ' (optional, up to ${AppConstants.maxPhotos})',
+                    ' (optional, up to ${AppConstants.maxAttachments})',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
               ],
             ),
-            _PhotoPicker(state: state),
-            if (show && state.photosError != null)
-              _ErrorText(state.photosError!),
+            _FilePicker(state: state),
+            if (show && state.filesError != null) _ErrorText(state.filesError!),
             const SizedBox(height: 12),
             Card(
               child: SwitchListTile(
@@ -170,11 +170,11 @@ class _ReportForm extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            if (state.isSubmitting && state.images.isNotEmpty) ...[
+            if (state.isSubmitting && state.files.isNotEmpty) ...[
               LinearProgressIndicator(borderRadius: BorderRadius.circular(4)),
               const SizedBox(height: 6),
               Text(
-                'Compressing and saving photos…',
+                'Uploading your files…',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -195,24 +195,49 @@ class _ReportForm extends StatelessWidget {
   }
 }
 
-class _PhotoPicker extends StatelessWidget {
-  const _PhotoPicker({required this.state});
+class _FilePicker extends StatelessWidget {
+  const _FilePicker({required this.state});
 
   final ReportFormState state;
 
   Future<void> _pick(BuildContext context) async {
     final cubit = context.read<ReportFormCubit>();
-    final source = (await showPhotoSourceSheet(context))?.imageSource;
-    if (source == null || !context.mounted) return;
+    final choice = await showPhotoSourceSheet(context, allowPdf: true);
+    if (choice == null || !context.mounted) return;
 
-    final remaining = AppConstants.maxPhotos - cubit.state.images.length;
-    final bytes = await pickPhotos(context, source, limit: remaining);
-    if (bytes.isEmpty) return;
+    final List<NewAttachment> picked;
+    if (choice == PhotoSourceChoice.pdf) {
+      final pdf = await pickPdf(context);
+      if (pdf == null) return;
+      picked = [
+        NewAttachment(
+          name: pdf.name,
+          bytes: pdf.bytes,
+          type: AttachmentType.pdf,
+        ),
+      ];
+    } else {
+      final remaining = AppConstants.maxAttachments - cubit.state.files.length;
+      final photos = await pickPhotos(
+        context,
+        choice.imageSource!,
+        limit: remaining,
+      );
+      picked = [
+        for (final bytes in photos)
+          NewAttachment(
+            name: 'Photo',
+            bytes: bytes,
+            type: AttachmentType.image,
+          ),
+      ];
+    }
+    if (picked.isEmpty) return;
 
-    final dropped = cubit.addImages(bytes);
+    final dropped = cubit.addFiles(picked);
     if (dropped > 0 && context.mounted) {
       context.showSnack(
-        'Only ${AppConstants.maxPhotos} photos are allowed; '
+        'Only ${AppConstants.maxAttachments} files are allowed; '
         '$dropped not added.',
         info: true,
       );
@@ -222,7 +247,7 @@ class _PhotoPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<ReportFormCubit>();
-    if (state.images.isEmpty) {
+    if (state.files.isEmpty) {
       return InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: state.isSubmitting ? null : () => _pick(context),
@@ -236,13 +261,10 @@ class _PhotoPicker extends StatelessWidget {
           child: const Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.add_photo_alternate_outlined,
-                color: AppColors.textSecondary,
-              ),
+              Icon(Icons.attach_file_rounded, color: AppColors.textSecondary),
               SizedBox(height: 6),
               Text(
-                'Tap to add photos',
+                'Tap to add photos or a PDF',
                 style: TextStyle(color: AppColors.textSecondary),
               ),
             ],
@@ -256,26 +278,28 @@ class _PhotoPicker extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          for (var i = 0; i < state.images.length; i++)
+          for (var i = 0; i < state.files.length; i++)
             Padding(
               padding: const EdgeInsets.only(right: 10),
               child: Stack(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(
-                      state.images[i],
-                      width: 96,
-                      height: 96,
-                      fit: BoxFit.cover,
-                    ),
+                    child: state.files[i].isPdf
+                        ? _PdfPreview(name: state.files[i].name)
+                        : Image.memory(
+                            state.files[i].bytes,
+                            width: 96,
+                            height: 96,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                   if (!state.isSubmitting)
                     Positioned(
                       top: 4,
                       right: 4,
                       child: InkWell(
-                        onTap: () => cubit.removeImage(i),
+                        onTap: () => cubit.removeFile(i),
                         child: const CircleAvatar(
                           radius: 12,
                           backgroundColor: Colors.black54,
@@ -290,7 +314,7 @@ class _PhotoPicker extends StatelessWidget {
                 ],
               ),
             ),
-          if (state.canAddPhotos && !state.isSubmitting)
+          if (state.canAddFiles && !state.isSubmitting)
             InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () => _pick(context),
@@ -304,6 +328,36 @@ class _PhotoPicker extends StatelessWidget {
                 child: const Icon(Icons.add_rounded, color: AppColors.primary),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PdfPreview extends StatelessWidget {
+  const _PdfPreview({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 96,
+      height: 96,
+      padding: const EdgeInsets.all(8),
+      color: AppColors.redTint,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.picture_as_pdf_rounded, color: AppColors.red),
+          const SizedBox(height: 6),
+          Text(
+            name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+          ),
         ],
       ),
     );

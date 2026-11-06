@@ -12,9 +12,9 @@ void main() {
     test('fromMap reads every field and tolerates missing ones', () {
       final i = Incident.fromMap('abc', {
         'title': 'Broken projector',
-        'description': 'The projector in Block B will not turn on.',
+        'description': 'The projector in the Computer Lab will not turn on.',
         'category': 'electricity',
-        'location': 'Block B',
+        'location': 'Computer Lab',
         'photoCount': 2,
         'thumbnail': Blob(Uint8List.fromList([1, 2, 3])),
         'status': 'inProgress',
@@ -38,6 +38,24 @@ void main() {
       expect(empty.status, IncidentStatus.submitted);
       expect(empty.photoCount, 0);
       expect(empty.thumbnail, isNull);
+    });
+
+    test('reads Supabase attachments and splits photos from PDFs', () {
+      final i = Incident.fromMap('abc', {
+        'attachments': [
+          {'url': 'https://x/1.jpg', 'name': 'Photo', 'type': 'image'},
+          {'url': 'https://x/2.pdf', 'name': 'quote.pdf', 'type': 'pdf'},
+        ],
+      });
+      expect(i.imageAttachments.single.url, 'https://x/1.jpg');
+      expect(i.pdfAttachments.single.name, 'quote.pdf');
+      expect(i.hasFiles, isTrue);
+      expect(Incident.fromMap('x', {}).hasFiles, isFalse);
+      expect(i.attachments.last.toMap(), {
+        'url': 'https://x/2.pdf',
+        'name': 'quote.pdf',
+        'type': 'pdf',
+      });
     });
 
     test('toCreateMap always starts as submitted with no upvotes', () {
