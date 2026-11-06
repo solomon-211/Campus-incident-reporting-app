@@ -1,6 +1,6 @@
 # Campus Incident Reporter
 
-A Flutter application for reporting and tracking campus maintenance and safety issues at ALU. Students submit reports with photos and location details, staff manage and resolve them through a dedicated dashboard, and everyone stays informed through real-time status updates.
+A Flutter application for reporting and tracking campus maintenance and safety issues at ALU. Students submit reports with photos, PDFs and location details, staff manage and resolve them through a dedicated dashboard, and everyone stays informed through real-time status updates.
 
 ## Overview
 
@@ -10,7 +10,7 @@ Campus issues currently travel through WhatsApp groups and word of mouth — mes
 
 ### Students
 - Register with an `@alustudent.com` email address and verify it before gaining access
-- Submit reports with a category, title, description, location and up to three photos
+- Submit reports with a category, title, description, location and up to three attachments (photos or PDFs)
 - Report anonymously for sensitive or safety-related concerns
 - Track each report through **Submitted → In Progress → Resolved / Rejected**, with staff notes at every step
 - Tap **Me too** on an existing report instead of filing a duplicate
@@ -26,7 +26,7 @@ Campus issues currently travel through WhatsApp groups and word of mouth — mes
 - Receive an alert as soon as a new report is submitted
 
 ### General
-- Offline support — reports submitted without a connection show **Pending sync** until they reach the server
+- Offline support — reports without attachments can be submitted without a connection and show **Pending sync** until they reach the server
 - Role-based navigation enforced at the router level; students and staff never see each other's screens
 
 ## Roles and Access
@@ -49,6 +49,8 @@ flutter pub get
 
 ### Firebase Setup
 
+Firebase handles sign-in and all report data.
+
 1. Create a project in the [Firebase Console](https://console.firebase.google.com).
 2. Under **Authentication**, enable the **Email/Password** sign-in method.
 3. Under **Firestore Database**, create a database in production mode.
@@ -65,6 +67,28 @@ firebase deploy --only firestore:rules --project YOUR_PROJECT_ID
 > On Windows, if `flutterfire` is not recognised, use `dart pub global run flutterfire_cli:flutterfire configure --project=YOUR_PROJECT_ID` instead.
 
 > Do not skip the rules deployment. Without it, every Firestore read and write fails with `permission-denied`.
+
+### Supabase Setup
+
+Photos and PDFs are stored in Supabase Storage, because Firebase Storage requires the paid Blaze plan.
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Under **Storage**, create a **public** bucket named `incident-files`.
+3. In the **SQL Editor**, run this policy so the app can upload images and PDFs to that bucket:
+
+```sql
+create policy "App can upload incident files"
+on storage.objects for insert
+to anon, authenticated
+with check (
+  bucket_id = 'incident-files'
+  and lower(storage.extension(name)) in ('jpg', 'jpeg', 'png', 'pdf')
+);
+```
+
+4. Under **Project Settings → API Keys**, copy the project URL and the **publishable** key into `supabaseUrl` and `supabaseKey` in [`lib/core/constants.dart`](lib/core/constants.dart).
+
+> Never put the **secret** key in the app. It bypasses every storage policy.
 
 ```bash
 flutter run
@@ -86,20 +110,20 @@ lib/
     extensions.dart
     load_status.dart
   data/
-    models/              AppUser, Incident, StatusUpdate
+    models/              AppUser, Incident, StatusUpdate, Attachment
     repositories/        All Firebase communication
-    services/            Photo compression
+    services/            Photo compression and Supabase file uploads
   features/
     auth/                Splash, login, register, email verification
     home/                Student home screen and notifications
     report/              Report submission form
     reports/             My Reports list
-    detail/              Incident detail, status timeline, photo viewer
+    detail/              Incident detail, status timeline, photo viewer, PDFs
     profile/             Profile management
     staff/               Staff dashboard and status update sheets
 ```
 
-Each feature follows a consistent structure: `cubit/`, `screens/` and optionally `widgets/`. Screens never communicate with Firebase directly — they interact with a cubit, which delegates to a repository. This separation makes every cubit independently testable with mocked repositories.
+Each feature follows a consistent structure: `cubit/`, `screens/` and optionally `widgets/`. Screens never communicate with Firebase or Supabase directly — they interact with a cubit, which delegates to a repository. This separation makes every cubit independently testable with mocked repositories.
 
 Navigation is handled by `go_router`. A single redirect function evaluates auth state on every route change: unauthenticated users go to login, unverified users go to the verification screen, students go to the home screen and staff go to the dashboard.
 
@@ -107,22 +131,20 @@ Navigation is handled by `go_router`. A single redirect function evaluates auth 
 
 Firestore has two top-level collections:
 
-- `users/{uid}` — name, email, role, program, campus, optional profile photo URL, and last notification view timestamp
-- `incidents/{id}` — title, description, category, location, status, priority, reporter UID, anonymous flag, Me Too list and a compressed thumbnail
+- `users/{uid}` — name, email, role, program, campus, optional profile photo (a small compressed image stored on the document), and last notification view timestamp
+- `incidents/{id}` — title, description, category, location, status, priority, reporter UID, anonymous flag, Me Too list, a compressed thumbnail and an `attachments` list
+- `incidents/{id}/updates` — the full status history rendered on the timeline
 
-Each incident document has two subcollections:
+The files themselves live in the Supabase `incident-files` bucket, one folder per report (for example `incident-files/<report-id>/1.jpg`). Each entry in `attachments` keeps only the file's public link, name and type. Photos are compressed on the device to under 700 KB before upload; PDFs must be under 10 MB.
 
-- `updates` — the full status history rendered on the timeline
-- `photos` — full-size compressed photos
-
-A new report, its initial timeline entry and its photos are written in a single batch operation, ensuring no partial data is ever stored.
+Files are uploaded first, then the report and its initial timeline entry are written in a single batch, so no partial report is ever stored. Photos from reports made before the move to Supabase are still read from an older `photos` subcollection.
 
 Access control is defined entirely in [`firestore.rules`](firestore.rules). Students may only create reports as themselves, add or remove their own Me Too, and delete their own report while it is still in Submitted status. Only staff may change a report's status or priority.
 
 ## Running Tests
 
 ```bash
-flutter test      # 54 tests
+flutter test      # 55 tests
 flutter analyze
 ```
 
@@ -130,7 +152,10 @@ Test coverage includes validators, model serialisation and Firestore mapping, ro
 
 ## Known Limitations
 
-- **Photo storage** — Photos are stored as compressed bytes in Firestore rather than Firebase Storage. Storage now requires the Blaze billing plan. This works at the current scale but Storage is the appropriate long-term solution.
+- **File uploads use a public key** — The app signs in with Firebase, so Supabase cannot tell which user uploaded a file. The storage policy limits uploads to images and PDFs in one bucket; tying uploads to signed-in users would need a Cloud Function, which requires Blaze.
+- **Files stay after a report is deleted** — The app's key can upload but not delete. Remove leftover files from the Supabase dashboard.
+- **Attachments need a connection** — Reports without attachments can be saved offline, but files can only be uploaded online.
+- **Supabase pauses idle projects** — A free project pauses after about a week without activity. Restore it from the dashboard before a demo.
 - **Push notifications** — In-app alerts only fire while the app is open. Background push notifications require Cloud Functions and Cloud Messaging, both of which require Blaze.
 - **Staff verification** — Staff accounts skip email verification for the demo, so anyone can register an `@alueducation.com` address. A real deployment should require verification or an admin approval step.
 - **Search** — Report search runs on the client. This is acceptable for a single campus but would not scale to a large dataset.
@@ -143,6 +168,8 @@ Test coverage includes validators, model serialisation and Firestore mapping, ro
 | `permission-denied` on any Firestore operation | Deploy the security rules and confirm the student's email is verified |
 | Staff account opens as student | Sign out and back in; the account is upgraded to staff automatically. Make sure the rules are deployed |
 | Stuck on "Check your inbox" | Check spam, or tap Resend on the verification screen |
+| "Could not upload your files" | Make sure the `incident-files` bucket exists and the upload policy above has been run in the Supabase SQL Editor |
+| A PDF won't open from a report | The phone needs a PDF viewer or browser installed |
 
 ## License
 
