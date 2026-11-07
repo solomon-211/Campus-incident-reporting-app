@@ -204,7 +204,11 @@ String? redirectFor(AuthState auth, String location) {
   final home = isStaff ? '/staff' : '/home';
   final atStaffPage = location == '/staff' || location.startsWith('/staff/');
 
-  if (location == '/splash' || atAuthPage) return home;
+  // Signed in: the entry screens (including verify-email, just after a
+  // student verifies) are no longer needed, so go home.
+  if (location == '/splash' || location == '/verify-email' || atAuthPage) {
+    return home;
+  }
   if (isStaff && !atStaffPage) return home;
   if (!isStaff && atStaffPage) return home;
   return null;

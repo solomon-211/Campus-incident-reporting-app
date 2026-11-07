@@ -40,6 +40,17 @@ void main() {
       expect(redirectFor(s, '/incident/1'), isNull);
     });
 
+    test('a student who has just verified leaves the verify screen', () {
+      expect(
+        redirectFor(const AuthAuthenticated(student), '/verify-email'),
+        '/home',
+      );
+      expect(
+        redirectFor(const AuthAuthenticated(staff), '/verify-email'),
+        '/staff',
+      );
+    });
+
     test('staff go to the dashboard and stay in staff pages', () {
       const s = AuthAuthenticated(staff);
       expect(redirectFor(s, '/login'), '/staff');
