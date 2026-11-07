@@ -10,6 +10,7 @@ Campus issues currently travel through WhatsApp groups and word of mouth — mes
 
 ### Students
 - Register with an `@alustudent.com` email address and verify it before gaining access
+- Sign in with **Remember me**, and reset a forgotten password by email
 - Submit reports with a category, title, description, location and up to three attachments (photos or PDFs)
 - Report anonymously for sensitive or safety-related concerns
 - Track each report through **Submitted → In Progress → Resolved / Rejected**, with staff notes at every step
@@ -129,7 +130,7 @@ Navigation is handled by `go_router`. A single redirect function evaluates auth 
 
 ## Data Model
 
-Firestore has two top-level collections:
+Firestore has two top-level collections, plus one subcollection per report:
 
 - `users/{uid}` — name, email, role, program, campus, optional profile photo (a small compressed image stored on the document), and last notification view timestamp
 - `incidents/{id}` — title, description, category, location, status, priority, reporter UID, anonymous flag, Me Too list, a compressed thumbnail and an `attachments` list
@@ -144,7 +145,7 @@ Access control is defined entirely in [`firestore.rules`](firestore.rules). Stud
 ## Running Tests
 
 ```bash
-flutter test      # 55 tests
+flutter test      # 56 tests
 flutter analyze
 ```
 
