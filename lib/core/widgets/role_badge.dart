@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../data/models/app_user.dart';
 
-/// Orange "Student" / "Staff" tag.
 class RoleBadge extends StatelessWidget {
   const RoleBadge(this.role, {super.key, this.large = false});
 

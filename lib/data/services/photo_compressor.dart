@@ -19,12 +19,8 @@ class PreparedPhotos {
   final Uint8List? thumbnail;
 }
 
-/// Shrinks photos so they fit inside Firestore documents.
-///
-/// Photos are kept in Firestore rather than Cloud Storage because Storage
-/// needs the paid Blaze plan; this keeps the app on the free Spark plan.
+/// Compresses photos on the device before they are uploaded or saved.
 class PhotoCompressor {
-  /// Firestore documents are capped at 1 MiB; stay well under it.
   static const maxPhotoBytes = 700 * 1024;
   static const maxThumbnailBytes = 60 * 1024;
   static const maxAvatarBytes = 120 * 1024;

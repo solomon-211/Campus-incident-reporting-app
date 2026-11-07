@@ -17,7 +17,6 @@ class StatusTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = <IncidentStatus?>[null, ...IncidentStatus.values];
-    // Every tab gets an equal share of the width, so none is ever hidden.
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(

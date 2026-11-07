@@ -143,7 +143,6 @@ class AuthRepository {
     }
   }
 
-  /// Saves the profile picture, or removes it when [photo] is null.
   Future<void> updatePhoto(String uid, Uint8List? photo) {
     return _users.doc(uid).update({
       'photo': photo == null ? null : Blob(photo),

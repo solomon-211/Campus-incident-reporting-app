@@ -144,7 +144,6 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-/// Avatar with a camera badge; tapping it changes the profile picture.
 class _EditableAvatar extends StatelessWidget {
   const _EditableAvatar({required this.user});
 

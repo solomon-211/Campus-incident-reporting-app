@@ -175,7 +175,6 @@ GoRouter createRouter(AuthCubit authCubit) {
   );
 }
 
-/// Profile for either role, with its own cubit for changing the photo.
 Widget _profilePage(AuthCubit authCubit) => Builder(
   builder: (context) => BlocProvider(
     create: (context) => ProfileCubit(
@@ -204,8 +203,7 @@ String? redirectFor(AuthState auth, String location) {
   final home = isStaff ? '/staff' : '/home';
   final atStaffPage = location == '/staff' || location.startsWith('/staff/');
 
-  // Signed in: the entry screens (including verify-email, just after a
-  // student verifies) are no longer needed, so go home.
+  // Includes verify-email, so a student who has just verified goes home.
   if (location == '/splash' || location == '/verify-email' || atAuthPage) {
     return home;
   }
