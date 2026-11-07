@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoSwitch;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -5,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
 import '../../../core/validators.dart';
-import '../../../core/widgets/field_label.dart';
 import '../../../core/widgets/no_handle_selection.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../cubit/auth_cubit.dart';
@@ -76,32 +76,24 @@ class _LoginScreenState extends State<LoginScreen> {
         if (state is AuthError) context.showSnack(state.message, error: true);
       },
       child: AuthScaffold(
-        title: 'Welcome back',
-        subtitle:
-            'Sign in to report campus issues and follow them '
-            'until they are fixed.',
-        showHighlights: true,
+        title: 'Sign in',
+        subtitle: 'Use your ALU email and password.',
         child: AutofillGroup(
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const FieldLabel('Email address'),
                 TextFormField(
                   controller: _email,
                   selectionControls: noHandleSelectionControls,
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    hintText: 'you@university.edu',
-                    prefixIcon: Icon(Icons.mail_outline_rounded),
-                  ),
+                  decoration: _fieldDecoration('ALU email'),
                   validator: Validators.email,
                 ),
-                const SizedBox(height: 18),
-                const FieldLabel('Password'),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: _password,
                   selectionControls: noHandleSelectionControls,
@@ -109,45 +101,43 @@ class _LoginScreenState extends State<LoginScreen> {
                   autofillHints: const [AutofillHints.password],
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
-                  decoration: InputDecoration(
-                    hintText: 'Enter your password',
-                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  decoration: _fieldDecoration('Password').copyWith(
                     suffixIcon: IconButton(
                       tooltip: _obscure ? 'Show password' : 'Hide password',
                       icon: Icon(
                         _obscure
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
+                        size: 20,
+                        color: AppColors.textSecondary,
                       ),
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
                   validator: Validators.password,
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _RememberMe(
-                        value: _remember,
-                        onChanged: (v) => setState(() => _remember = v),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _forgotPassword,
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        textStyle: const TextStyle(
-                          fontFamily: AppTheme.fontFamily,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                const SizedBox(height: 10),
+                MergeSemantics(
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Remember me',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
-                      child: const Text('Forgot password?'),
-                    ),
-                  ],
+                      CupertinoSwitch(
+                        value: _remember,
+                        activeTrackColor: AppColors.primary,
+                        onChanged: (v) => setState(() => _remember = v),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 BlocBuilder<AuthCubit, AuthState>(
                   builder: (context, state) => PrimaryButton(
                     label: 'Sign in',
@@ -155,25 +145,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _submit,
                   ),
                 ),
-                const SizedBox(height: 20),
-                const _OrDivider(),
-                const SizedBox(height: 20),
-                OutlinedButton(
-                  onPressed: () => context.go('/register'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(54),
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.border, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    textStyle: const TextStyle(
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+                const SizedBox(height: 8),
+                Center(
+                  child: TextButton(
+                    onPressed: _forgotPassword,
+                    child: const Text('Forgot password?'),
                   ),
-                  child: const Text('Create an account'),
+                ),
+                const SizedBox(height: 24),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      "Don't have an account?",
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/register'),
+                      child: const Text('Create one'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -182,73 +174,8 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
 
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(child: Divider(color: AppColors.border)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'New to Campus Reporter?',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-          ),
-        ),
-        Expanded(child: Divider(color: AppColors.border)),
-      ],
-    );
-  }
-}
-
-class _RememberMe extends StatelessWidget {
-  const _RememberMe({required this.value, required this.onChanged});
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return MergeSemantics(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => onChanged(!value),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox.square(
-              dimension: 32,
-              child: Checkbox(
-                value: value,
-                onChanged: (v) => onChanged(v ?? false),
-                activeColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.border, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-            const SizedBox(width: 6),
-            const Flexible(
-              child: Text(
-                'Remember me',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  /// A framed field on a light fill, so it stands out inside the white card.
+  InputDecoration _fieldDecoration(String hint) =>
+      InputDecoration(hintText: hint, fillColor: AppColors.background);
 }

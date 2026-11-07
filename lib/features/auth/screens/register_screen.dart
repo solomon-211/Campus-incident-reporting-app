@@ -55,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       },
       child: AuthScaffold(
         title: 'Create account',
-        subtitle: 'Join your campus in getting problems fixed faster.',
+        subtitle: 'Sign up with your ALU email.',
         child: Form(
           key: _formKey,
           child: Column(
@@ -81,7 +81,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 textInputAction: TextInputAction.next,
                 autofillHints: const [AutofillHints.email],
                 decoration: const InputDecoration(
-                  hintText: 'you@university.edu',
+                  hintText: 'name@alustudent.com',
                   prefixIcon: Icon(Icons.mail_outline_rounded),
                 ),
                 validator: Validators.email,

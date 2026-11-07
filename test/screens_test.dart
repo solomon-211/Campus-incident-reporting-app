@@ -119,9 +119,10 @@ void main() {
       initialState: const AuthUnauthenticated(),
     );
     await pump(tester, const LoginScreen());
-    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Use your ALU email and password.'), findsOneWidget);
 
-    await tester.tap(find.text('Sign in'));
+    // The heading and the button both read "Sign in"; the button is last.
+    await tester.tap(find.text('Sign in').last);
     await tester.pump();
     expect(find.text('Email is required'), findsOneWidget);
     verifyNever(() => auth.login(any(), any()));

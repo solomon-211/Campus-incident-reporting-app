@@ -152,6 +152,10 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final user = await _repository.reloadUser();
       if (user == null || !user.emailVerified) return false;
+      // Cancel the existing profile sub before _onAuthChanged starts a new one,
+      // otherwise the two subscriptions race and the state may never update.
+      await _profileSub?.cancel();
+      _profileSub = null;
       _onAuthChanged(user);
       return true;
     } catch (_) {
